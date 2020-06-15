@@ -4,6 +4,7 @@
 from __future__ import annotations
 from typing import Callable, Optional, Union
 
+import numpy as np
 import torch
 from torch import Tensor, nn
 from torch.utils.tensorboard import SummaryWriter
@@ -25,6 +26,7 @@ class SNLE_A(LikelihoodEstimator):
         simulation_batch_size: int = 1,
         density_estimator: Union[str, nn.Module] = "maf",
         mcmc_method: str = "slice_np",
+        external_data: Optional[Union[Tensor, np.ndarray]] = None,
         device: Union[torch.device, str] = get_default_device(),
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[SummaryWriter] = None,

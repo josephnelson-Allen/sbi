@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import cast, Callable, Dict, List, Optional, Union
 from warnings import warn
 
+import numpy as np
 import torch
 from torch import Tensor
 from torch.utils.tensorboard import SummaryWriter
@@ -20,6 +21,7 @@ from sbi.user_input.user_input_checks import process_x
 from sbi.user_input.user_input_checks import prepare_for_sbi
 from sbi.utils import get_log_root
 from sbi.utils.plot import pairplot
+from sbi.utils import handle_invalid_x, warn_on_invalid_x
 from sbi.utils.torchutils import get_default_device
 
 
@@ -81,6 +83,7 @@ class NeuralInference(ABC):
         x_shape: Optional[torch.Size] = None,
         num_workers: int = 1,
         simulation_batch_size: int = 1,
+        external_data: Optional[Union[Tensor, np.ndarray]] = None,
         device: Union[torch.device, str] = get_default_device(),
         logging_level: Union[int, str] = "WARNING",
         summary_writer: Optional[SummaryWriter] = None,
@@ -130,10 +133,22 @@ class NeuralInference(ABC):
         )
 
         self._device = device
+        self._use_external_data = True if external_data is not None else False
 
         # Initialize roundwise (theta, x) for storage of parameters and simulations.
         # XXX Rename self._roundwise_* or self._rounds_*
         self._theta_bank, self._x_bank = [], []
+
+        # Check for NaNs in simulations.
+        # TODO True should be exclude_invalid_x
+        is_valid_x, num_nans, num_infs = handle_invalid_x(external_data[1], True)
+        warn_on_invalid_x(num_nans, num_infs, True)
+
+        # TODO be aware that this will be considered the first round examples -
+        # TODO excluding potential first round simulations.
+        if self._use_external_data:
+            self._theta_bank.append(external_data[0, is_valid_x])
+            self._x_bank.append(external_data[1, is_valid_x])
 
         # XXX We could instantiate here the Posterior for all children. Two problems:
         #     1. We must dispatch to right PotentialProvider for mcmc based on name
