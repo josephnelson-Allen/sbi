@@ -170,12 +170,13 @@ class LikelihoodEstimator(NeuralInference, ABC):
             x = self._batched_simulator(theta)
 
             # Check for NaNs in simulations.
-            is_valid_x, num_nans, num_infs = handle_invalid_x(x, exclude_invalid_x)
-            warn_on_invalid_x(num_nans, num_infs, exclude_invalid_x)
+            if len(x) > 0:
+                is_valid_x, num_nans, num_infs = handle_invalid_x(x, exclude_invalid_x)
+                warn_on_invalid_x(num_nans, num_infs, exclude_invalid_x)
 
-            # Store (theta, x) pairs.
-            self._theta_bank.append(theta[is_valid_x])
-            self._x_bank.append(x[is_valid_x])
+                # Store (theta, x) pairs.
+                self._theta_bank.append(theta[is_valid_x])
+                self._x_bank.append(x[is_valid_x])
 
             # Fit neural likelihood to newly aggregated dataset.
             self._train(

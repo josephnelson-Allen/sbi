@@ -137,7 +137,7 @@ class NeuralInference(ABC):
 
         # Initialize roundwise (theta, x) for storage of parameters and simulations.
         # XXX Rename self._roundwise_* or self._rounds_*
-        self._theta_bank, self._x_bank = [], []
+        self._theta_bank, self._x_bank, self._prior_masks = [], [], []
 
         # Check for NaNs in simulations.
         # TODO True should be exclude_invalid_x
@@ -147,8 +147,9 @@ class NeuralInference(ABC):
         # TODO be aware that this will be considered the first round examples -
         # TODO excluding potential first round simulations.
         if self._use_external_data:
-            self._theta_bank.append(external_data[0, is_valid_x])
-            self._x_bank.append(external_data[1, is_valid_x])
+            self._theta_bank.append(external_data[0][is_valid_x])
+            self._x_bank.append(external_data[1][is_valid_x])
+            self._prior_masks.append(torch.ones((external_data[0][is_valid_x].shape[0], 1), dtype=torch.bool))
 
         # XXX We could instantiate here the Posterior for all children. Two problems:
         #     1. We must dispatch to right PotentialProvider for mcmc based on name

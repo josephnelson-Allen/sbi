@@ -4,6 +4,7 @@
 from __future__ import annotations
 from typing import Callable, Optional, Union
 
+import numpy as np
 import torch
 from torch import Tensor, eye, nn, ones
 from torch.utils.tensorboard import SummaryWriter
@@ -24,6 +25,7 @@ class SNPE_C(PosteriorEstimator):
         num_workers: int = 1,
         simulation_batch_size: int = 1,
         density_estimator: Union[str, nn.Module] = "maf",
+        external_data: Optional[Union[Tensor, np.ndarray]] = None,
         sample_with_mcmc: bool = False,
         mcmc_method: str = "slice_np",
         use_combined_loss: bool = False,

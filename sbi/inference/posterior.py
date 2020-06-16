@@ -294,7 +294,6 @@ class NeuralPosterior:
 
         return self._leakage_density_correction_factor  # type:ignore
 
-    @torch.no_grad()
     def sample(
         self,
         sample_shape: Shape = torch.Size(),
@@ -354,7 +353,6 @@ class NeuralPosterior:
 
         return samples.reshape((*sample_shape, -1))
 
-    @torch.no_grad()
     def _sample_posterior_mcmc(
         self,
         num_samples: int,
@@ -496,7 +494,7 @@ class NeuralPosterior:
             initial_params={"": initial_params},
             num_chains=num_chains,
             mp_context="fork",
-            disable_progbar=not show_progress_bars,
+            disable_progbar=not show_progress_bars
         )
         sampler.run()
         samples = next(iter(sampler.get_samples().values())).reshape(

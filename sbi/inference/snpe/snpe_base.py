@@ -32,6 +32,7 @@ class PosteriorEstimator(NeuralInference, ABC):
         num_workers: int = 1,
         simulation_batch_size: int = 1,
         density_estimator: Union[str, nn.Module] = "maf",
+        external_data: Optional[Union[Tensor, np.ndarray]] = None,
         sample_with_mcmc: bool = False,
         mcmc_method: str = "slice_np",
         device: Union[torch.device, str] = get_default_device(),
@@ -55,6 +56,7 @@ class PosteriorEstimator(NeuralInference, ABC):
             x_shape=x_shape,
             num_workers=num_workers,
             simulation_batch_size=simulation_batch_size,
+            external_data=external_data,
             device=device,
             logging_level=logging_level,
             summary_writer=summary_writer,
@@ -78,7 +80,7 @@ class PosteriorEstimator(NeuralInference, ABC):
             get_potential_function=PotentialFunctionProvider(),
         )
 
-        self._prior_masks, self._model_bank = [], []
+        self._model_bank = []
 
         # If we're retraining from scratch each round, keep a copy
         # of the original untrained model for reinitialization.
@@ -167,6 +169,21 @@ class PosteriorEstimator(NeuralInference, ABC):
             theta, x, prior_mask = self._run_simulations(round_, num_sims)
 
             if round_ == 0:
+                # If we're retraining from scratch each round, keep a copy
+                # of the original untrained model for reinitialization.
+                self._untrained_neural_posterior = deepcopy(self._posterior)
+
+            if len(x) > 0:
+                # Check for NaNs in simulations.
+                is_valid_x, num_nans, num_infs = handle_invalid_x(x, exclude_invalid_x)
+                warn_on_invalid_x(num_nans, num_infs, exclude_invalid_x)
+
+                # XXX Rename bank -> rounds/roundwise.
+                self._theta_bank.append(theta[is_valid_x])
+                self._x_bank.append(x[is_valid_x])
+                self._prior_masks.append(prior_mask[is_valid_x])
+
+            if round_ == 0:
                 # What is happening here? By design, we want the neural net to take care
                 # of normalizing both input and output, x and theta. But since we don't
                 # know the dimensions of these upon instantiation, or in the case of
@@ -180,21 +197,8 @@ class PosteriorEstimator(NeuralInference, ABC):
                 # more transparent.
                 if z_score_x:
                     self._posterior.set_embedding_net(
-                        self._prepend_z_score(x, z_score_min_std, exclude_invalid_x)
+                        self._prepend_z_score(self._x_bank[0], z_score_min_std, exclude_invalid_x)
                     )
-
-                # If we're retraining from scratch each round, keep a copy
-                # of the original untrained model for reinitialization.
-                self._untrained_neural_posterior = deepcopy(self._posterior)
-
-            # Check for NaNs in simulations.
-            is_valid_x, num_nans, num_infs = handle_invalid_x(x, exclude_invalid_x)
-            warn_on_invalid_x(num_nans, num_infs, exclude_invalid_x)
-
-            # XXX Rename bank -> rounds/roundwise.
-            self._theta_bank.append(theta[is_valid_x])
-            self._x_bank.append(x[is_valid_x])
-            self._prior_masks.append(prior_mask[is_valid_x])
 
             # Fit posterior using newly aggregated data set.
             self._train(
@@ -296,6 +300,7 @@ class PosteriorEstimator(NeuralInference, ABC):
         x_std[x_std == 0] = z_score_min_std
         preprocess = Standardize(torch.mean(x[is_valid_x], dim=0), x_std)
 
+        # If Sequential has a None component, forward will TypeError.
         # If Sequential has a None component, forward will TypeError.
         return preprocess if embed_nn is None else nn.Sequential(preprocess, embed_nn)
 
