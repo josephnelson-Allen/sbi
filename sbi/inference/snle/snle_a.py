@@ -2,6 +2,7 @@
 # under the Affero General Public License v3, see <https://www.gnu.org/licenses/>.
 
 from __future__ import annotations
+
 from typing import Callable, Optional, Union
 
 import torch
@@ -10,9 +11,9 @@ from torch.utils.tensorboard import SummaryWriter
 
 from sbi.inference.posterior import NeuralPosterior
 from sbi.inference.snle.snle_base import LikelihoodEstimator
-from sbi.utils.torchutils import get_default_device
 from sbi.types import OneOrMore
 from sbi.utils import del_entries
+from sbi.utils.torchutils import get_default_device
 
 
 class SNLE_A(LikelihoodEstimator):
@@ -23,7 +24,7 @@ class SNLE_A(LikelihoodEstimator):
         x_shape: Optional[torch.Size] = None,
         num_workers: int = 1,
         simulation_batch_size: int = 1,
-        density_estimator: Union[str, nn.Module] = "maf",
+        density_estimator: Union[str, Callable] = "maf",
         mcmc_method: str = "slice_np",
         device: Union[torch.device, str] = get_default_device(),
         logging_level: Union[int, str] = "WARNING",
@@ -52,10 +53,15 @@ class SNLE_A(LikelihoodEstimator):
                 maps to data x at once. If None, we simulate all parameter sets at the
                 same time. If >= 1, the simulator has to process data of shape
                 (simulation_batch_size, parameter_dimension).
-            density_estimator: Either a string or a density estimation neural network
-                that can `.log_prob()` and `.sample()`. If it is a string, use a pre-
-                configured network of the provided type (one of nsf, maf, mdn, made).
-            mcmc_method: If MCMC sampling is used, specify the method here: either of
+            density_estimator: If it is a string, use a pre-configured network of the
+                provided type (one of nsf, maf, mdn, made). Alternatively, a function
+                that builds a custom neural network can be provided. The function will
+                be called with the first batch of simulations (theta, x), which can
+                thus be used for shape inference and potentially for z-scoring. It
+                needs to return a PyTorch `nn.Module` implementing the density
+                estimator. The density estimator needs to provide the methods
+                `.log_prob` and `.sample()`.
+            mcmc_method: Specify the method for MCMC sampling, either either of:
                 slice_np, slice, hmc, nuts.
             device: torch device on which to compute, e.g. cuda, cpu.
             logging_level: Minimum severity of messages to log. One of the strings
